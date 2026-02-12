@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
   generateRoomCode,
   formatTime,
@@ -14,7 +14,6 @@ import { useNavigate } from "react-router-dom";
 export default function Presenter() {
   const [roomCode] = useState(() => generateRoomCode());
   const nav = useNavigate();
-  const [playerIds, setPlayerIds] = useState<Set<string>>(new Set());
 
   const joinUrl = useMemo(() => {
     const base = window.location.origin;
@@ -31,23 +30,21 @@ export default function Presenter() {
 
   const [copied, setCopied] = useState<string | null>(null);
 
-  const onMsg = useCallback((msg: RealtimeMsg) => {
-    if (msg.type === "JOIN") {
-      const { playerId } = msg.payload;
-      setPlayerIds((prev) => {
-        const newSet = new Set(prev);
-        if (!newSet.has(playerId)) {
-          newSet.add(playerId);
-          setState((prevState) => ({
-            ...prevState,
-            playerCount: newSet.size,
-            version: prevState.version + 1,
-          }));
-        }
-        return newSet;
-      });
+  const playerIdsRef = useRef<Set<string>>(new Set());
+
+const onMsg = useCallback((msg: RealtimeMsg) => {
+  if (msg.type === "JOIN") {
+    const { playerId } = msg.payload;
+    if (!playerIdsRef.current.has(playerId)) {
+      playerIdsRef.current.add(playerId);
+      setState((prevState) => ({
+        ...prevState,
+        playerCount: playerIdsRef.current.size,
+        version: prevState.version + 1,
+      }));
     }
-  }, []);
+  }
+}, []);
 
   const { publish } = useRoomChannel(roomCode, onMsg);
 
