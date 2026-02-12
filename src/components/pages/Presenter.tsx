@@ -20,6 +20,12 @@ export default function Presenter() {
     return `${base}/player?room=${roomCode}`;
   }, [roomCode]);
 
+    const boardUrl = useMemo(() => {
+    const base = window.location.origin;
+    return `${base}/board?room=${roomCode}`;
+  }, [roomCode]);
+
+
   const [state, setState] = useState<RoomState>(() => ({
     roomCode,
     round: 1,
@@ -54,13 +60,17 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
   }, [state, publish]);
 
   // Helpers
-  const setRound = (round: Round) => {
+    const setRound = (round: Round) => {
     setState((prev) => ({
       ...prev,
       round,
       version: prev.version + 1,
     }));
+
+    // Open the Board in a new tab so you keep presenter controls
+    window.open(boardUrl, "_blank");
   };
+
 
   const adjustTime = (deltaMs: number) => {
     setState((prev) => ({

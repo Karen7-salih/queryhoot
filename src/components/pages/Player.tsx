@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import AnalogClock from "../clock/AnalogClock";
-import type { RealtimeMsg, RoomState } from "../../lib/game";
+import type { PlayerSnapshot, RealtimeMsg, RoomState } from "../../lib/game";
 import { formatTime } from "../../lib/game";
 import { useRoomChannel } from "../../lib/useRoomChannel";
 import { Users, RefreshCw, ArrowLeft } from "lucide-react";
@@ -33,17 +33,43 @@ export default function Player() {
   // For Round 1 "manual refresh": we keep a "last fetched snapshot"
   const [manualSnapshot, setManualSnapshot] = useState<RoomState | null>(null);
 
+    const [nowMs, setNowMs] = useState(() => Date.now());
+
+   const [anchorLocalMs, setAnchorLocalMs] = useState(() => Date.now());
+  const [anchorServerMs, setAnchorServerMs] = useState(() => Date.now());
+
+  const setAnchorFromState = useCallback((s: RoomState) => {
+    const now = Date.now();
+    setAnchorLocalMs(now);
+    setAnchorServerMs(s.serverEpochMs);
+  }, []);
+
+
 
 const onMsg = useCallback((msg: RealtimeMsg) => {
-  if (msg.type === "STATE") {
-    setServerState(msg.payload);
+  if (msg.type !== "STATE") return;
 
-    // Round 2: auto update snapshot immediately
-    if (msg.payload.round === 2) {
-      setManualSnapshot(msg.payload);
-    }
+  const next = msg.payload;
+  setServerState(next);
+
+  if (next.round === 2) {
+    // auto mode: everyone syncs immediately
+    setManualSnapshot(next);
+    // anchor should match the new "displayState"
+    setAnchorFromState(next);
+    return;
   }
-}, []);
+
+  // Round 1: don't auto update snapshot (manual refresh only)
+  // BUT: if it's the first ever snapshot, initialize it so player sees something
+  setManualSnapshot((prev) => {
+    if (prev) return prev;
+    setAnchorFromState(next);
+    return next;
+  });
+}, [setAnchorFromState]);
+
+
 
   const { publish } = useRoomChannel(roomCode, onMsg);
 
@@ -53,30 +79,33 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
     publish({ type: "JOIN", payload: { playerId } });
   }, [roomCode, publish, playerId]);
 
-  // If we just joined and got first serverState:
-  // - Round 1: set snapshot only once (like "initial fetch")
-  // - Round 2: snapshot already auto updates in onMsg
-  useEffect(() => {
-    if (!serverState) return;
 
-    if (serverState.round === 1 && !manualSnapshot) {
-      setManualSnapshot(serverState);
-    }
-  }, [serverState, manualSnapshot]);
+
+    useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
 
   const joinRoom = () => {
-    const cleaned = roomInput.trim();
-    if (!cleaned) return;
-    setRoomCode(cleaned);
-    // reset local views for new room
-    setServerState(null);
-    setManualSnapshot(null);
-  };
+  const cleaned = roomInput.trim();
+  if (!cleaned) return;
+  setRoomCode(cleaned);
+
+  setServerState(null);
+  setManualSnapshot(null);
+
+  setAnchorLocalMs(Date.now());
+  setAnchorServerMs(Date.now());
+};
+
 
   const refresh = () => {
-    if (!serverState) return;
-    setManualSnapshot(serverState);
-  };
+  if (!serverState) return;
+  setManualSnapshot(serverState);
+  setAnchorFromState(serverState);
+};
+
 
   // What time do we show?
   const displayState = useMemo(() => {
@@ -85,7 +114,33 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
     return manualSnapshot; // Round 1 manual
   }, [serverState, manualSnapshot]);
 
-  const timeMs = displayState?.serverEpochMs ?? Date.now();
+
+
+
+    const timeMs = useMemo(() => {
+    if (!displayState) return nowMs;
+    const elapsed = nowMs - anchorLocalMs;
+    return anchorServerMs + elapsed;
+  }, [displayState, nowMs, anchorLocalMs, anchorServerMs]);
+
+
+    useEffect(() => {
+    if (!roomCode || !displayState) return;
+
+    const payload: PlayerSnapshot = {
+      playerId,
+      displayEpochMs: timeMs,
+      syncedVersion: displayState.version,
+      round: displayState.round,
+      sentAtMs: Date.now(),
+    };
+
+    publish({ type: "PLAYER_SNAPSHOT", payload });
+  }, [roomCode, displayState, timeMs, playerId, publish]);
+
+
+
+
 
   return (
     <div style={styles.container}>
