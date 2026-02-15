@@ -5,17 +5,17 @@ export type RoomState = {
   round: Round;
   serverEpochMs: number;
   playerCount: number;
-  version: number;  
-  refreshOwnerId: string | null; 
+  version: number;
+  refreshOwnerId: string | null;
+  refreshedPlayerIds: string[]; 
 };
-
 
 export type PlayerSnapshot = {
   playerId: string;
-  displayEpochMs: number; // what the player currently shows on their phone
-  syncedVersion: number; // which server version they are synced to (Round 1 will be older if they didn't refresh)
+  displayEpochMs: number;
+  syncedVersion: number;
   round: Round;
-  sentAtMs: number; // client timestamp (for debugging)
+  sentAtMs: number;
 };
 
 export type RealtimeMsg =

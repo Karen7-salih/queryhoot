@@ -33,8 +33,6 @@ export default function Player() {
   const [manualSnapshot, setManualSnapshot] = useState<RoomState | null>(null);
 
     const [nowMs, setNowMs] = useState(() => Date.now());
-    const [hasUsedRefresh, setHasUsedRefresh] = useState(false);
-
 
    const [anchorLocalMs, setAnchorLocalMs] = useState(() => Date.now());
   const [anchorServerMs, setAnchorServerMs] = useState(() => Date.now());
@@ -93,7 +91,6 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
   if (!cleaned) return;
   setRoomCode(cleaned);
 
-  setHasUsedRefresh(false);
   setServerState(null);
   setManualSnapshot(null);
 
@@ -107,11 +104,10 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
 
   publish({ type: "REFRESH_USED", payload: { playerId } });
 
-  setHasUsedRefresh(true); 
-
   setManualSnapshot(serverState);
   setAnchorFromState(serverState);
 };
+
 
 
 
@@ -212,14 +208,15 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
           {serverState && (
   <div style={styles.clockContainer}>
     {/* Refresh button for Round 1 */}
-             {serverState.round === 1 &&
+            {serverState.round === 1 &&
   serverState.refreshOwnerId === playerId &&
-  !hasUsedRefresh && (
+  !serverState.refreshedPlayerIds.includes(playerId) && (
     <button onClick={refresh} style={styles.refreshButton}>
       <RefreshCw size={18} style={{ marginRight: "8px" }} />
       Refresh Time
     </button>
 )}
+
 
 
 
