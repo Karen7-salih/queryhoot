@@ -87,7 +87,7 @@ if (msg.type === "JOIN") {
 
 
 
- if (msg.type === "REFRESH_USED") {
+if (msg.type === "REFRESH_USED") {
   const { playerId } = msg.payload;
 
   setState((prev) => {
@@ -104,28 +104,23 @@ if (msg.type === "JOIN") {
 
     const nextOwner = allRefreshed ? null : pickRandomRefreshOwner(playerId, refreshed);
 
+    // ✅ if everyone refreshed, jump to board
+    if (allRefreshed) {
+      // microtask so React finishes state update first
+      queueMicrotask(() => nav(`/board?room=${roomCode}`));
+    }
+
     return {
       ...prev,
       version: prev.version + 1,
       refreshOwnerId: nextOwner,
-      refreshedPlayerIds: Array.from(refreshed), 
+      refreshedPlayerIds: Array.from(refreshed),
     };
   });
 
-  // after state updates, still compute allRefreshed (safe)
-  const allPlayers = Array.from(playerIdsRef.current);
-  const allRefreshed =
-    allPlayers.length > 0 &&
-    allPlayers.every((id) => refreshedIdsRef.current.has(id) || id === playerId);
-
-  refreshedIdsRef.current.add(playerId);
-
-  if (allRefreshed) {
-    nav(`/board?room=${roomCode}`);
-  }
-
   return;
 }
+
 
 }, [nav, roomCode]);
 
