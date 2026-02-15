@@ -26,7 +26,9 @@ export default function Presenter() {
   playerCount: 0,
   version: 1,
   refreshOwnerId: null,
+  refreshedPlayerIds: [], // ✅ NEW
 }));
+
 
 
   const [copied, setCopied] = useState<string | null>(null);
@@ -34,24 +36,21 @@ export default function Presenter() {
   const refreshedIdsRef = useRef<Set<string>>(new Set());
 
 
- const pickRandomRefreshOwner = (excludeId?: string) => {
+ const pickRandomRefreshOwner = (excludeId?: string, refreshed: Set<string> = refreshedIdsRef.current) => {
   const allIds = Array.from(playerIdsRef.current);
 
-  const notRefreshed = allIds.filter((id) => !refreshedIdsRef.current.has(id));
+  const candidates = allIds.filter((id) => !refreshed.has(id) && id !== excludeId);
 
-  const candidates = excludeId
-    ? notRefreshed.filter((id) => id !== excludeId)
-    : notRefreshed;
-
-  if (candidates.length === 0) return null; 
+  if (candidates.length === 0) return null;
   return candidates[Math.floor(Math.random() * candidates.length)];
 };
 
 
 
 
+
 const onMsg = useCallback((msg: RealtimeMsg) => {
- if (msg.type === "JOIN") {
+if (msg.type === "JOIN") {
   const { playerId } = msg.payload;
 
   if (!playerIdsRef.current.has(playerId)) {
@@ -59,13 +58,27 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
   }
 
   setState((prev) => {
-    const shouldAssignOwner = prev.round === 1 && prev.refreshOwnerId === null;
+    if (prev.round !== 1) {
+      return {
+        ...prev,
+        playerCount: playerIdsRef.current.size,
+        version: prev.version + 1,
+      };
+    }
+
+    const refreshed = new Set(prev.refreshedPlayerIds);
+    const ownerIsValid =
+      prev.refreshOwnerId &&
+      playerIdsRef.current.has(prev.refreshOwnerId) &&
+      !refreshed.has(prev.refreshOwnerId);
+
+    const nextOwner = ownerIsValid ? prev.refreshOwnerId : pickRandomRefreshOwner(undefined, refreshed);
 
     return {
       ...prev,
       playerCount: playerIdsRef.current.size,
       version: prev.version + 1,
-      refreshOwnerId: shouldAssignOwner ? pickRandomRefreshOwner() : prev.refreshOwnerId,
+      refreshOwnerId: nextOwner,
     };
   });
 
@@ -73,35 +86,39 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
 }
 
 
+
  if (msg.type === "REFRESH_USED") {
   const { playerId } = msg.payload;
 
-  // mark this player as "already refreshed once"
-  refreshedIdsRef.current.add(playerId);
-
   setState((prev) => {
-    // only rotate in Round 1, and only if the current owner used it
     if (prev.round !== 1) return prev;
     if (prev.refreshOwnerId !== playerId) return prev;
+
+    const refreshed = new Set(prev.refreshedPlayerIds);
+    refreshed.add(playerId);
 
     const allPlayers = Array.from(playerIdsRef.current);
     const allRefreshed =
       allPlayers.length > 0 &&
-      allPlayers.every((id) => refreshedIdsRef.current.has(id));
+      allPlayers.every((id) => refreshed.has(id));
 
-    const nextOwner = allRefreshed ? null : pickRandomRefreshOwner(playerId);
+    const nextOwner = allRefreshed ? null : pickRandomRefreshOwner(playerId, refreshed);
 
     return {
       ...prev,
       version: prev.version + 1,
       refreshOwnerId: nextOwner,
+      refreshedPlayerIds: Array.from(refreshed), 
     };
   });
 
+  // after state updates, still compute allRefreshed (safe)
   const allPlayers = Array.from(playerIdsRef.current);
   const allRefreshed =
     allPlayers.length > 0 &&
-    allPlayers.every((id) => refreshedIdsRef.current.has(id));
+    allPlayers.every((id) => refreshedIdsRef.current.has(id) || id === playerId);
+
+  refreshedIdsRef.current.add(playerId);
 
   if (allRefreshed) {
     nav(`/board?room=${roomCode}`);
@@ -109,6 +126,7 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
 
   return;
 }
+
 }, [nav, roomCode]);
 
 
@@ -124,16 +142,25 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
   // Helpers
   const setRound = (round: Round) => {
   if (round === 1) {
-    refreshedIdsRef.current.clear(); 
+    refreshedIdsRef.current.clear();
   }
 
-  setState((prev) => ({
-    ...prev,
-    round,
-    version: prev.version + 1,
-    refreshOwnerId: round === 1 ? pickRandomRefreshOwner() : null,
-  }));
+  setState((prev) => {
+    const refreshedPlayerIds = round === 1 ? [] : prev.refreshedPlayerIds;
+
+    const refreshedSet = new Set(refreshedPlayerIds);
+    const refreshOwnerId = round === 1 ? pickRandomRefreshOwner(undefined, refreshedSet) : null;
+
+    return {
+      ...prev,
+      round,
+      version: prev.version + 1,
+      refreshOwnerId,
+      refreshedPlayerIds,
+    };
+  });
 };
+
 
 
 
