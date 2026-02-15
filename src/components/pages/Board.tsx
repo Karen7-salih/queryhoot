@@ -27,6 +27,8 @@ export default function Board() {
 
   const [anchorLocalMs, setAnchorLocalMs] = useState(() => Date.now());
 const [anchorServerMs, setAnchorServerMs] = useState(() => Date.now());
+const [startingRound2, setStartingRound2] = useState(false);
+
 
 
 useEffect(() => {
@@ -36,6 +38,22 @@ useEffect(() => {
 
 
   const onMsg = useCallback((msg: RealtimeMsg) => {
+    if (msg.type === "SET_ROUND") {
+  const { round } = msg.payload;
+
+  setServerState((prev) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      round,
+      version: prev.version + 1,
+      refreshOwnerId: null,
+    };
+  });
+
+  return;
+}
+
     if (msg.type === "STATE") {
   const s = msg.payload;
   setServerState(s);
@@ -166,22 +184,39 @@ const serverTimeText = liveServerMs ? formatTime(liveServerMs) : "--:--:--";
 
           {roomCode && serverState?.round === 1 && (
   <button
-    onClick={() => publish?.({ type: "SET_ROUND", payload: { round: 2 } })}
+    onClick={() => {
+      if (!serverState) return;
+
+      // ✅ optimistic UI (board switches immediately)
+      setStartingRound2(true);
+      setServerState((prev) => {
+        if (!prev) return prev;
+        return { ...prev, round: 2, version: prev.version + 1, refreshOwnerId: null };
+      });
+
+      // ✅ actually tell presenter (this removes "publish never used")
+      publish({ type: "SET_ROUND", payload: { round: 2 } });
+
+      setTimeout(() => setStartingRound2(false), 600);
+    }}
+    disabled={startingRound2}
     style={{
       marginTop: 12,
       width: "100%",
       padding: "14px",
       borderRadius: 14,
       border: "none",
-      background: "#46178f",
+      background: startingRound2 ? "#2f0f61" : "#46178f",
+      opacity: startingRound2 ? 0.8 : 1,
       color: "white",
       fontWeight: 900,
-      cursor: "pointer",
+      cursor: startingRound2 ? "not-allowed" : "pointer",
     }}
   >
-    Start Round 2 (Auto Sync)
+    {startingRound2 ? "Starting Round 2..." : "Start Round 2 (Auto Sync)"}
   </button>
 )}
+
 
         </div>
 
