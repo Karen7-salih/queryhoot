@@ -1,73 +1,60 @@
-# React + TypeScript + Vite
+# QueryHoot
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+QueryHoot is a real-time interactive workshop application designed to teach the core concepts of server-state synchronization and demonstrate the value of React Query through hands-on experience.
 
-Currently, two official plugins are available:
+Participants join a shared room and observe how client state behaves under two conditions:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Round 1 - Manual Sync:** Clients must manually refresh to stay up to date, simulating traditional `useEffect`-based fetching.
+- **Round 2 - Auto Sync:** Clients update automatically, demonstrating the behavior and advantages of React Query-style synchronization.
 
-## React Compiler
+This contrast helps developers understand server state, synchronization challenges, and how automatic state management improves reliability and developer experience.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Features
 
-## Expanding the ESLint configuration
+- Real-time synchronization using Ably
+- Presenter-controlled server state
+- Multi-player room system
+- Live board visualization of all connected clients
+- Manual vs automatic synchronization modes
+- Persistent presenter session state
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Tech Stack
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- React
+- TypeScript
+- React Router
+- Ably Realtime
+- Vite
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Installation
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### 1. Clone the repository
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+```bash
+git clone https://github.com/YOUR_USERNAME/queryhoot.git
+cd queryhoot
+2. Install dependencies
+npm install
+3. Configure environment variables
+Create a .env file in the root directory:
+
+VITE_ABLY_KEY=your_ably_api_key
+You can obtain a key from: https://ably.com/
+
+4. Run the development server
+npm run dev
+The app will start at:
+
+http://localhost:5173
+Usage
+Presenter:
+
+http://localhost:5173/presenter
+Players:
+
+http://localhost:5173/player?room=ROOM_CODE
+Board:
+
+http://localhost:5173/board?room=ROOM_CODE
