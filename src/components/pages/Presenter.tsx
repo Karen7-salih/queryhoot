@@ -42,7 +42,6 @@ const [state, setState] = useState<RoomState>(() => {
   if (raw) {
     try {
       const saved = JSON.parse(raw) as RoomState;
-      // keep the current roomCode always
       return { ...saved, roomCode };
     } catch {
       // ignore broken storage
@@ -200,11 +199,8 @@ if (msg.type === "REFRESH_USED") {
 
   const { publish } = useRoomChannel(roomCode, onMsg);
 
-  // Broadcast current state on every change
   useEffect(() => {
-  // save
   sessionStorage.setItem(storageKey, JSON.stringify(state));
-  // broadcast
   publish({ type: "STATE", payload: state });
 }, [state, publish, storageKey]);
 
@@ -219,7 +215,6 @@ if (msg.type === "REFRESH_USED") {
   };
 
   const randomJump = () => {
-    // random jump between -5 minutes and +5 minutes
     const delta = Math.floor((Math.random() * 10 - 5) * 60_000);
     adjustTime(delta);
   };
