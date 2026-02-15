@@ -1,19 +1,27 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ably, roomChannelName } from "./ably";
 import type { RealtimeMsg } from "./game";
 
-export function useRoomChannel(roomCode: string | null, onMsg: (msg: RealtimeMsg) => void) {
+export function useRoomChannel(
+  roomCode: string | null,
+  onMsg: (msg: RealtimeMsg) => void
+) {
   const channel = useMemo(() => {
     if (!roomCode) return null;
     return ably.channels.get(roomChannelName(roomCode));
   }, [roomCode]);
 
+  const onMsgRef = useRef(onMsg);
+  useEffect(() => {
+    onMsgRef.current = onMsg;
+  }, [onMsg]);
+
   useEffect(() => {
     if (!channel) return;
 
     const handler = (m: any) => {
-      onMsg(m.data as RealtimeMsg);
+      onMsgRef.current(m.data as RealtimeMsg);
     };
 
     channel.subscribe("msg", handler);
@@ -21,12 +29,15 @@ export function useRoomChannel(roomCode: string | null, onMsg: (msg: RealtimeMsg
     return () => {
       channel.unsubscribe("msg", handler);
     };
-  }, [channel, onMsg]);
+  }, [channel]);
 
-  function publish(msg: RealtimeMsg) {
-    if (!channel) return;
-    channel.publish("msg", msg);
-  }
+  const publish = useCallback(
+    (msg: RealtimeMsg) => {
+      if (!channel) return;
+      channel.publish("msg", msg);
+    },
+    [channel]
+  );
 
   return { channel, publish };
 }
