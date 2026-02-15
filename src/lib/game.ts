@@ -3,10 +3,12 @@ export type Round = 1 | 2;
 export type RoomState = {
   roomCode: string;
   round: Round;
-  serverEpochMs: number; // the “server time”
+  serverEpochMs: number;
   playerCount: number;
-  version: number; // increments on each server change
+  version: number;  
+  refreshOwnerId: string | null; 
 };
+
 
 export type PlayerSnapshot = {
   playerId: string;
@@ -17,13 +19,18 @@ export type PlayerSnapshot = {
 };
 
 export type RealtimeMsg =
-  | { type: "STATE"; payload: RoomState }
   | { type: "JOIN"; payload: { playerId: string } }
-  | { type: "PLAYER_SNAPSHOT"; payload: PlayerSnapshot };
+  | { type: "STATE"; payload: RoomState }
+  | { type: "PLAYER_SNAPSHOT"; payload: PlayerSnapshot }
+  | { type: "REFRESH_USED"; payload: { playerId: string } };
+
 
 export function generateRoomCode() {
   return Math.floor(100000 + Math.random() * 900000).toString(); // 6 digits
 }
+
+
+
 
 export function formatTime(ms: number) {
   const d = new Date(ms);

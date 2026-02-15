@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/purity */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import AnalogClock from "../clock/AnalogClock";
@@ -34,6 +33,8 @@ export default function Player() {
   const [manualSnapshot, setManualSnapshot] = useState<RoomState | null>(null);
 
     const [nowMs, setNowMs] = useState(() => Date.now());
+    const [hasUsedRefresh, setHasUsedRefresh] = useState(false);
+
 
    const [anchorLocalMs, setAnchorLocalMs] = useState(() => Date.now());
   const [anchorServerMs, setAnchorServerMs] = useState(() => Date.now());
@@ -92,6 +93,7 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
   if (!cleaned) return;
   setRoomCode(cleaned);
 
+  setHasUsedRefresh(false);
   setServerState(null);
   setManualSnapshot(null);
 
@@ -102,9 +104,16 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
 
   const refresh = () => {
   if (!serverState) return;
+
+  publish({ type: "REFRESH_USED", payload: { playerId } });
+
+  setHasUsedRefresh(true); 
+
   setManualSnapshot(serverState);
   setAnchorFromState(serverState);
 };
+
+
 
 
   // What time do we show?
@@ -203,12 +212,16 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
           {serverState && (
   <div style={styles.clockContainer}>
     {/* Refresh button for Round 1 */}
-              {serverState.round === 1 && (
-                <button onClick={refresh} style={styles.refreshButton}>
-                  <RefreshCw size={18} style={{ marginRight: '8px' }} />
-                  Refresh Time
-                </button>
-              )}
+             {serverState.round === 1 &&
+  serverState.refreshOwnerId === playerId &&
+  !hasUsedRefresh && (
+    <button onClick={refresh} style={styles.refreshButton}>
+      <RefreshCw size={18} style={{ marginRight: "8px" }} />
+      Refresh Time
+    </button>
+)}
+
+
 
               {/* Clock display */}
               <div style={styles.clockWrapper}>

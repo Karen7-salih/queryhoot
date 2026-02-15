@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useRoomChannel } from "../../lib/useRoomChannel";
@@ -8,7 +7,7 @@ import {
   type RealtimeMsg,
   type RoomState,
 } from "../../lib/game";
-import { ArrowLeft, Clock, Users, TriangleAlert, Activity } from "lucide-react";
+import { ArrowLeft, Clock, Users } from "lucide-react";
 
 type SnapshotMap = Record<string, PlayerSnapshot>;
 
@@ -24,11 +23,31 @@ export default function Board() {
   const [serverState, setServerState] = useState<RoomState | null>(null);
   const [snapshots, setSnapshots] = useState<SnapshotMap>({});
 
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  const [anchorLocalMs, setAnchorLocalMs] = useState(() => Date.now());
+const [anchorServerMs, setAnchorServerMs] = useState(() => Date.now());
+
+
+useEffect(() => {
+  const t = setInterval(() => setNowMs(Date.now()), 1000);
+  return () => clearInterval(t);
+}, []);
+
+
   const onMsg = useCallback((msg: RealtimeMsg) => {
     if (msg.type === "STATE") {
-      setServerState(msg.payload);
-      return;
-    }
+  const s = msg.payload;
+  setServerState(s);
+
+  // anchor "server time" so it ticks smoothly on board
+  const now = Date.now();
+  setAnchorLocalMs(now);
+  setAnchorServerMs(s.serverEpochMs);
+
+  return;
+}
+
     if (msg.type === "PLAYER_SNAPSHOT") {
       const p = msg.payload;
       setSnapshots((prev) => ({
@@ -45,7 +64,14 @@ export default function Board() {
     return Object.values(snapshots).sort((a, b) => a.playerId.localeCompare(b.playerId));
   }, [snapshots]);
 
-  const serverTimeText = serverState ? formatTime(serverState.serverEpochMs) : "--:--:--";
+  const liveServerMs = useMemo(() => {
+  if (!serverState) return null;
+  const elapsed = nowMs - anchorLocalMs;
+  return anchorServerMs + elapsed;
+}, [serverState, nowMs, anchorLocalMs, anchorServerMs]);
+
+const serverTimeText = liveServerMs ? formatTime(liveServerMs) : "--:--:--";
+
 
   return (
     <div style={styles.container}>
@@ -83,18 +109,6 @@ export default function Board() {
             <div style={styles.statValue}>{serverTimeText}</div>
             <div style={styles.statLabel}>Server Time</div>
           </div>
-
-          <div style={styles.statCard}>
-            <Activity size={20} color="#46178f" />
-            <div style={styles.statValue}>{serverState?.version ?? "-"}</div>
-            <div style={styles.statLabel}>Version</div>
-          </div>
-
-          <div style={styles.statCard}>
-            <TriangleAlert size={20} color="#46178f" />
-            <div style={styles.statValue}>{serverState?.round ?? "-"}</div>
-            <div style={styles.statLabel}>Round</div>
-          </div>
         </div>
 
         {!roomCode && (
@@ -113,38 +127,27 @@ export default function Board() {
         {/* Grid */}
         <div style={styles.grid}>
           {players.map((p, idx) => {
-            const isSynced =
-              serverState ? p.syncedVersion === serverState.version : true;
 
             const deltaSec = serverState
-              ? Math.round((p.displayEpochMs - serverState.serverEpochMs) / 1000)
+              ? Math.round((p.displayEpochMs - (liveServerMs ?? serverState.serverEpochMs)) / 1000)
               : 0;
 
             const deltaLabel =
               deltaSec === 0 ? "Δ 0s" : deltaSec > 0 ? `Δ +${deltaSec}s` : `Δ ${deltaSec}s`;
 
-            const badge =
-              isSynced
-                ? { text: "FRESH", bg: "#4caf50" }
-                : { text: "STALE", bg: "#ff9800" };
-
             return (
               <div key={p.playerId} style={styles.playerCard}>
                 <div style={styles.playerTop}>
-                  <div style={styles.playerName}>
-                    Player {idx + 1} <span style={styles.playerId}>({shortId(p.playerId)})</span>
-                  </div>
-                  <div style={{ ...styles.badge, background: badge.bg }}>
-                    {badge.text}
-                  </div>
-                </div>
+  <div style={styles.playerName}>
+    Player {idx + 1} <span style={styles.playerId}>({shortId(p.playerId)})</span>
+  </div>
+</div>
 
                 <div style={styles.timeBig}>{formatTime(p.displayEpochMs)}</div>
 
-                <div style={styles.metaRow}>
-                  <div style={styles.metaChip}>{deltaLabel}</div>
-                  <div style={styles.metaChip}>v{p.syncedVersion}</div>
-                </div>
+               <div style={styles.metaRow}>
+  <div style={styles.metaChip}>{deltaLabel}</div>
+</div>
 
                 <div style={styles.smallHint}>
                   {serverState?.round === 1
