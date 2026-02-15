@@ -22,14 +22,15 @@ export type RealtimeMsg =
   | { type: "JOIN"; payload: { playerId: string } }
   | { type: "STATE"; payload: RoomState }
   | { type: "PLAYER_SNAPSHOT"; payload: PlayerSnapshot }
-  | { type: "REFRESH_USED"; payload: { playerId: string } };
+  | { type: "REFRESH_USED"; payload: { playerId: string } }
+  | { type: "SET_ROUND"; payload: { round: Round } };
+
+
 
 
 export function generateRoomCode() {
   return Math.floor(100000 + Math.random() * 900000).toString(); // 6 digits
 }
-
-
 
 
 export function formatTime(ms: number) {

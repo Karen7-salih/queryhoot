@@ -36,20 +36,56 @@ export default function Presenter() {
   const refreshedIdsRef = useRef<Set<string>>(new Set());
 
 
- const pickRandomRefreshOwner = (excludeId?: string, refreshed: Set<string> = refreshedIdsRef.current) => {
-  const allIds = Array.from(playerIdsRef.current);
+const pickRandomRefreshOwner = useCallback(
+  (excludeId?: string, refreshed: Set<string> = refreshedIdsRef.current) => {
+    const allIds = Array.from(playerIdsRef.current);
 
-  const candidates = allIds.filter((id) => !refreshed.has(id) && id !== excludeId);
+    const candidates = allIds.filter((id) => !refreshed.has(id) && id !== excludeId);
 
-  if (candidates.length === 0) return null;
-  return candidates[Math.floor(Math.random() * candidates.length)];
-};
+    if (candidates.length === 0) return null;
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  },
+  []
+);
 
 
 
 
 
-const onMsg = useCallback((msg: RealtimeMsg) => {
+
+  const setRound = useCallback(
+  (round: Round) => {
+    if (round === 1) {
+      refreshedIdsRef.current.clear();
+    }
+
+    setState((prev) => {
+      const refreshedPlayerIds = round === 1 ? [] : prev.refreshedPlayerIds;
+
+      const refreshedSet = new Set(refreshedPlayerIds);
+      const refreshOwnerId =
+        round === 1 ? pickRandomRefreshOwner(undefined, refreshedSet) : null;
+
+      return {
+        ...prev,
+        round,
+        version: prev.version + 1,
+        refreshOwnerId,
+        refreshedPlayerIds,
+      };
+    });
+  },
+  [pickRandomRefreshOwner]
+);
+
+
+const onMsg = useCallback(
+  (msg: RealtimeMsg) => {
+    if (msg.type === "SET_ROUND") {
+  setRound(msg.payload.round);
+  return;
+}
+
 if (msg.type === "JOIN") {
   const { playerId } = msg.payload;
 
@@ -83,6 +119,7 @@ if (msg.type === "JOIN") {
   });
 
   return;
+
 }
 
 
@@ -104,9 +141,7 @@ if (msg.type === "REFRESH_USED") {
 
     const nextOwner = allRefreshed ? null : pickRandomRefreshOwner(playerId, refreshed);
 
-    // ✅ if everyone refreshed, jump to board
     if (allRefreshed) {
-      // microtask so React finishes state update first
       queueMicrotask(() => nav(`/board?room=${roomCode}`));
     }
 
@@ -118,11 +153,14 @@ if (msg.type === "REFRESH_USED") {
     };
   });
 
+  
+
   return;
+
+  
 }
+}, [nav, roomCode, pickRandomRefreshOwner, setRound]);
 
-
-}, [nav, roomCode]);
 
 
 
@@ -135,26 +173,7 @@ if (msg.type === "REFRESH_USED") {
   }, [state, publish]);
 
   // Helpers
-  const setRound = (round: Round) => {
-  if (round === 1) {
-    refreshedIdsRef.current.clear();
-  }
 
-  setState((prev) => {
-    const refreshedPlayerIds = round === 1 ? [] : prev.refreshedPlayerIds;
-
-    const refreshedSet = new Set(refreshedPlayerIds);
-    const refreshOwnerId = round === 1 ? pickRandomRefreshOwner(undefined, refreshedSet) : null;
-
-    return {
-      ...prev,
-      round,
-      version: prev.version + 1,
-      refreshOwnerId,
-      refreshedPlayerIds,
-    };
-  });
-};
 
 
 

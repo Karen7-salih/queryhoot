@@ -58,7 +58,8 @@ useEffect(() => {
     }
   }, []);
 
-  useRoomChannel(roomCode, onMsg);
+  const { publish } = useRoomChannel(roomCode, onMsg);
+
 
   const players = useMemo(() => {
     return Object.values(snapshots).sort((a, b) => a.playerId.localeCompare(b.playerId));
@@ -133,7 +134,12 @@ const serverTimeText = liveServerMs ? formatTime(liveServerMs) : "--:--:--";
               : 0;
 
             const deltaLabel =
-              deltaSec === 0 ? "Δ 0s" : deltaSec > 0 ? `Δ +${deltaSec}s` : `Δ ${deltaSec}s`;
+  deltaSec === 0
+    ? "Synced ✅"
+    : deltaSec > 0
+      ? `Ahead by ${deltaSec}s`
+      : `Behind by ${Math.abs(deltaSec)}s`;
+
 
             return (
               <div key={p.playerId} style={styles.playerCard}>
@@ -157,6 +163,26 @@ const serverTimeText = liveServerMs ? formatTime(liveServerMs) : "--:--:--";
               </div>
             );
           })}
+
+          {roomCode && serverState?.round === 1 && (
+  <button
+    onClick={() => publish?.({ type: "SET_ROUND", payload: { round: 2 } })}
+    style={{
+      marginTop: 12,
+      width: "100%",
+      padding: "14px",
+      borderRadius: 14,
+      border: "none",
+      background: "#46178f",
+      color: "white",
+      fontWeight: 900,
+      cursor: "pointer",
+    }}
+  >
+    Start Round 2 (Auto Sync)
+  </button>
+)}
+
         </div>
 
         {players.length === 0 && roomCode && (

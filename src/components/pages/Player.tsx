@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import AnalogClock from "../clock/AnalogClock";
 import type { PlayerSnapshot, RealtimeMsg, RoomState } from "../../lib/game";
@@ -8,10 +8,12 @@ import { Users, RefreshCw, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 
+
 function getOrCreatePlayerId() {
 
   const key = "queryhoot_player_id_session";
   const existing = sessionStorage.getItem(key);
+  
   if (existing) return existing;
 
   const id =
@@ -28,6 +30,7 @@ export default function Player() {
   const [params] = useSearchParams();
   const nav = useNavigate();
   const roomFromUrl = params.get("room");
+  
 
   const [roomInput, setRoomInput] = useState(roomFromUrl ?? "");
   const [roomCode, setRoomCode] = useState<string | null>(roomFromUrl);
@@ -43,6 +46,10 @@ export default function Player() {
 
    const [anchorLocalMs, setAnchorLocalMs] = useState(() => Date.now());
   const [anchorServerMs, setAnchorServerMs] = useState(() => Date.now());
+  const refreshLockRef = useRef(false);
+
+
+
 
   const setAnchorFromState = useCallback((s: RoomState) => {
     const now = Date.now();
@@ -57,6 +64,8 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
 
   const next = msg.payload;
   setServerState(next);
+refreshLockRef.current = false;
+
 
   if (next.round === 2) {
     // auto mode: everyone syncs immediately
@@ -87,6 +96,9 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
 
 
 
+
+
+
     useEffect(() => {
     const t = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(t);
@@ -106,14 +118,19 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
 };
 
 
-  const refresh = () => {
+ const refresh = () => {
   if (!serverState) return;
+  if (refreshLockRef.current) return;
+refreshLockRef.current = true;
+
 
   publish({ type: "REFRESH_USED", payload: { playerId } });
 
   setManualSnapshot(serverState);
   setAnchorFromState(serverState);
 };
+
+
 
   // What time do we show?
   const displayState = useMemo(() => {
@@ -218,13 +235,30 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
           {serverState && (
   <div style={styles.clockContainer}>
     {/* Refresh button for Round 1 */}
-            {serverState.round === 1 &&
+          {serverState.round === 1 &&
   serverState.refreshOwnerId === playerId &&
   !serverState.refreshedPlayerIds.includes(playerId) && (
     <button onClick={refresh} style={styles.refreshButton}>
       <RefreshCw size={18} style={{ marginRight: "8px" }} />
       Refresh Time
     </button>
+)}
+
+
+{serverState.round === 2 && (
+  <div
+    style={{
+      background: "#46178f",
+      color: "white",
+      padding: "10px 18px",
+      borderRadius: 999,
+      fontWeight: 900,
+      fontSize: 14,
+      boxShadow: "0 4px 12px rgba(70, 23, 143, 0.35)",
+    }}
+  >
+    Auto Sync ON ✅ (React Query mode)
+  </div>
 )}
 
 
