@@ -97,7 +97,7 @@ const serverTimeText = liveServerMs ? formatTime(liveServerMs) : "--:--:--";
       <div style={styles.mainCard}>
         {/* Header */}
         <div style={styles.header}>
-          <button onClick={() => nav("/presenter")} style={styles.backButton}>
+          <button onClick={() => nav(`/presenter?room=${roomCode}`)} style={styles.backButton}>
             <ArrowLeft size={20} />
             <span>Presenter</span>
           </button>
@@ -184,38 +184,44 @@ const serverTimeText = liveServerMs ? formatTime(liveServerMs) : "--:--:--";
 
           {roomCode && serverState?.round === 1 && (
   <button
-    onClick={() => {
-      if (!serverState) return;
-
-      // ✅ optimistic UI (board switches immediately)
-      setStartingRound2(true);
-      setServerState((prev) => {
-        if (!prev) return prev;
-        return { ...prev, round: 2, version: prev.version + 1, refreshOwnerId: null };
-      });
-
-      // ✅ actually tell presenter (this removes "publish never used")
-      publish({ type: "SET_ROUND", payload: { round: 2 } });
-
-      setTimeout(() => setStartingRound2(false), 600);
+    type="button"
+    style={{
+      ...styles.startRound2Button,
+      ...(startingRound2 ? styles.startRound2ButtonLoading : {}),
     }}
     disabled={startingRound2}
-    style={{
-      marginTop: 12,
-      width: "100%",
-      padding: "14px",
-      borderRadius: 14,
-      border: "none",
-      background: startingRound2 ? "#2f0f61" : "#46178f",
-      opacity: startingRound2 ? 0.8 : 1,
-      color: "white",
-      fontWeight: 900,
-      cursor: startingRound2 ? "not-allowed" : "pointer",
+    onClick={() => {
+      if (!serverState || !roomCode) return;
+
+      setStartingRound2(true);
+
+      const nextState: RoomState = {
+        ...serverState,
+        round: 2,
+        version: serverState.version + 1,
+        refreshOwnerId: null,
+        refreshedPlayerIds: serverState.refreshedPlayerIds ?? [],
+      };
+
+      setServerState(nextState);
+
+      sessionStorage.setItem(
+        `queryhoot_room_state_${roomCode}`,
+        JSON.stringify(nextState)
+      );
+
+      publish({ type: "STATE", payload: nextState });
+      publish({ type: "SET_ROUND", payload: { round: 2 } });
+
+      nav(`/presenter?room=${roomCode}`);
+
+      setStartingRound2(false);
     }}
   >
     {startingRound2 ? "Starting Round 2..." : "Start Round 2 (Auto Sync)"}
   </button>
 )}
+
 
 
         </div>
@@ -433,4 +439,28 @@ const styles = {
     fontFamily: "monospace",
     fontWeight: 900,
   },
+
+  startRound2Button: {
+  padding: "14px 16px",
+  background: "#46178f",
+  border: "none",
+  borderRadius: "10px",
+  fontSize: "15px",
+  fontWeight: 800,
+  color: "white",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
+  transition: "all 0.2s",
+  boxShadow: "0 2px 8px rgba(70, 23, 143, 0.3)",
+},
+
+startRound2ButtonLoading: {
+  opacity: 0.7,
+  cursor: "not-allowed",
+  transform: "scale(0.99)",
+},
+
 };

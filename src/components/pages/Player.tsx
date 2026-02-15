@@ -60,29 +60,44 @@ export default function Player() {
 
 
 const onMsg = useCallback((msg: RealtimeMsg) => {
+  if (msg.type === "SET_ROUND") {
+    const { round } = msg.payload;
+
+    setServerState((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, round, version: prev.version + 1, refreshOwnerId: null };
+
+      // if round2 → instantly adopt auto sync behavior
+      if (round === 2) {
+        setManualSnapshot(next);
+        setAnchorFromState(next);
+      }
+
+      return next;
+    });
+
+    return;
+  }
+
   if (msg.type !== "STATE") return;
 
   const next = msg.payload;
   setServerState(next);
-refreshLockRef.current = false;
-
+  refreshLockRef.current = false;
 
   if (next.round === 2) {
-    // auto mode: everyone syncs immediately
     setManualSnapshot(next);
-    // anchor should match the new "displayState"
     setAnchorFromState(next);
     return;
   }
 
-  // Round 1: don't auto update snapshot (manual refresh only)
-  // BUT: if it's the first ever snapshot, initialize it so player sees something
   setManualSnapshot((prev) => {
     if (prev) return prev;
     setAnchorFromState(next);
     return next;
   });
 }, [setAnchorFromState]);
+
 
 
 

@@ -17,23 +17,58 @@ export function useRoomChannel(
     onMsgRef.current = onMsg;
   }, [onMsg]);
 
+  // Track whether channel is attached
+  const isAttachedRef = useRef(false);
+
   useEffect(() => {
     if (!channel) return;
+
+    let cancelled = false;
 
     const handler = (m: any) => {
       onMsgRef.current(m.data as RealtimeMsg);
     };
 
-    channel.subscribe("msg", handler);
+    const attachAndSubscribe = async () => {
+      try {
+        // ✅ ensure channel is attached before subscribing
+        await channel.attach();
+        if (cancelled) return;
+
+        isAttachedRef.current = true;
+        channel.subscribe("msg", handler);
+      } catch (err) {
+        console.error("Failed to attach/subscribe to Ably channel", err);
+      }
+    };
+
+    attachAndSubscribe();
 
     return () => {
-      channel.unsubscribe("msg", handler);
+      cancelled = true;
+      isAttachedRef.current = false;
+      try {
+        channel.unsubscribe("msg", handler);
+      } catch {
+        // ignore
+      }
     };
   }, [channel]);
 
   const publish = useCallback(
     (msg: RealtimeMsg) => {
       if (!channel) return;
+
+      // ✅ prevent publish before attach (helps “same session” reliability)
+      if (!isAttachedRef.current) {
+        // quick retry (don’t block UI)
+        channel.attach().then(() => {
+          isAttachedRef.current = true;
+          channel.publish("msg", msg);
+        });
+        return;
+      }
+
       channel.publish("msg", msg);
     },
     [channel]
