@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
   generateRoomCode,
@@ -20,37 +19,100 @@ export default function Presenter() {
     return `${base}/player?room=${roomCode}`;
   }, [roomCode]);
 
-    const boardUrl = useMemo(() => {
-    const base = window.location.origin;
-    return `${base}/board?room=${roomCode}`;
-  }, [roomCode]);
-
-
   const [state, setState] = useState<RoomState>(() => ({
-    roomCode,
-    round: 1,
-    serverEpochMs: Date.now(),
-    playerCount: 0,
-    version: 1,
-  }));
+  roomCode,
+  round: 1,
+  serverEpochMs: Date.now(),
+  playerCount: 0,
+  version: 1,
+  refreshOwnerId: null,
+}));
+
 
   const [copied, setCopied] = useState<string | null>(null);
-
   const playerIdsRef = useRef<Set<string>>(new Set());
+  const refreshedIdsRef = useRef<Set<string>>(new Set());
+
+
+ const pickRandomRefreshOwner = (excludeId?: string) => {
+  const allIds = Array.from(playerIdsRef.current);
+
+  const notRefreshed = allIds.filter((id) => !refreshedIdsRef.current.has(id));
+
+  const candidates = excludeId
+    ? notRefreshed.filter((id) => id !== excludeId)
+    : notRefreshed;
+
+  if (candidates.length === 0) return null; 
+  return candidates[Math.floor(Math.random() * candidates.length)];
+};
+
+
+
 
 const onMsg = useCallback((msg: RealtimeMsg) => {
-  if (msg.type === "JOIN") {
-    const { playerId } = msg.payload;
-    if (!playerIdsRef.current.has(playerId)) {
-      playerIdsRef.current.add(playerId);
-      setState((prevState) => ({
-        ...prevState,
-        playerCount: playerIdsRef.current.size,
-        version: prevState.version + 1,
-      }));
-    }
+ if (msg.type === "JOIN") {
+  const { playerId } = msg.payload;
+
+  if (!playerIdsRef.current.has(playerId)) {
+    playerIdsRef.current.add(playerId);
   }
-}, []);
+
+  setState((prev) => {
+    const shouldAssignOwner = prev.round === 1 && prev.refreshOwnerId === null;
+
+    return {
+      ...prev,
+      playerCount: playerIdsRef.current.size,
+      version: prev.version + 1,
+      refreshOwnerId: shouldAssignOwner ? pickRandomRefreshOwner() : prev.refreshOwnerId,
+    };
+  });
+
+  return;
+}
+
+
+ if (msg.type === "REFRESH_USED") {
+  const { playerId } = msg.payload;
+
+  // mark this player as "already refreshed once"
+  refreshedIdsRef.current.add(playerId);
+
+  setState((prev) => {
+    // only rotate in Round 1, and only if the current owner used it
+    if (prev.round !== 1) return prev;
+    if (prev.refreshOwnerId !== playerId) return prev;
+
+    const allPlayers = Array.from(playerIdsRef.current);
+    const allRefreshed =
+      allPlayers.length > 0 &&
+      allPlayers.every((id) => refreshedIdsRef.current.has(id));
+
+    const nextOwner = allRefreshed ? null : pickRandomRefreshOwner(playerId);
+
+    return {
+      ...prev,
+      version: prev.version + 1,
+      refreshOwnerId: nextOwner,
+    };
+  });
+
+  const allPlayers = Array.from(playerIdsRef.current);
+  const allRefreshed =
+    allPlayers.length > 0 &&
+    allPlayers.every((id) => refreshedIdsRef.current.has(id));
+
+  if (allRefreshed) {
+    nav(`/board?room=${roomCode}`);
+  }
+
+  return;
+}
+}, [nav, roomCode]);
+
+
+
 
   const { publish } = useRoomChannel(roomCode, onMsg);
 
@@ -60,16 +122,20 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
   }, [state, publish]);
 
   // Helpers
-    const setRound = (round: Round) => {
-    setState((prev) => ({
-      ...prev,
-      round,
-      version: prev.version + 1,
-    }));
+  const setRound = (round: Round) => {
+  if (round === 1) {
+    refreshedIdsRef.current.clear(); 
+  }
 
-    // Open the Board in a new tab so you keep presenter controls
-    window.open(boardUrl, "_blank");
-  };
+  setState((prev) => ({
+    ...prev,
+    round,
+    version: prev.version + 1,
+    refreshOwnerId: round === 1 ? pickRandomRefreshOwner() : null,
+  }));
+};
+
+
 
 
   const adjustTime = (deltaMs: number) => {
