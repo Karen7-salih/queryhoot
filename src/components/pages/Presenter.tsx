@@ -9,25 +9,57 @@ import {
 import { useRoomChannel } from "../../lib/useRoomChannel";
 import { Users, Copy, Link2, Clock, Hash, Pause, Zap, Plus, Minus, Shuffle, RotateCcw, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+
 
 export default function Presenter() {
-  const [roomCode] = useState(() => generateRoomCode());
+  const [params] = useSearchParams();
   const nav = useNavigate();
+
+
+const [roomCode] = useState(() => {
+  return params.get("room") ?? generateRoomCode();
+});
+
+useEffect(() => {
+  const urlRoom = params.get("room");
+  if (!urlRoom) {
+    nav(`/presenter?room=${roomCode}`, { replace: true });
+  }
+}, [params, nav, roomCode]);
+
+
+const storageKey = useMemo(() => `queryhoot_room_state_${roomCode}`, [roomCode]);
+
 
   const joinUrl = useMemo(() => {
     const base = window.location.origin;
     return `${base}/player?room=${roomCode}`;
   }, [roomCode]);
 
-  const [state, setState] = useState<RoomState>(() => ({
-  roomCode,
-  round: 1,
-  serverEpochMs: Date.now(),
-  playerCount: 0,
-  version: 1,
-  refreshOwnerId: null,
-  refreshedPlayerIds: [], // ✅ NEW
-}));
+const [state, setState] = useState<RoomState>(() => {
+  const raw = sessionStorage.getItem(`queryhoot_room_state_${roomCode}`);
+  if (raw) {
+    try {
+      const saved = JSON.parse(raw) as RoomState;
+      // keep the current roomCode always
+      return { ...saved, roomCode };
+    } catch {
+      // ignore broken storage
+    }
+  }
+
+  return {
+    roomCode,
+    round: 1,
+    serverEpochMs: Date.now(),
+    playerCount: 0,
+    version: 1,
+    refreshOwnerId: null,
+    refreshedPlayerIds: [],
+  };
+});
+
 
 
 
@@ -85,6 +117,7 @@ const onMsg = useCallback(
   setRound(msg.payload.round);
   return;
 }
+
 
 if (msg.type === "JOIN") {
   const { playerId } = msg.payload;
@@ -169,13 +202,11 @@ if (msg.type === "REFRESH_USED") {
 
   // Broadcast current state on every change
   useEffect(() => {
-    publish({ type: "STATE", payload: state });
-  }, [state, publish]);
-
-  // Helpers
-
-
-
+  // save
+  sessionStorage.setItem(storageKey, JSON.stringify(state));
+  // broadcast
+  publish({ type: "STATE", payload: state });
+}, [state, publish, storageKey]);
 
 
 
@@ -295,32 +326,40 @@ if (msg.type === "REFRESH_USED") {
         {/* Round Controls */}
         <div style={styles.section}>
           <h3 style={styles.sectionTitle}>Round Controls</h3>
-          <div style={styles.roundButtons}>
-            <button
-              onClick={() => setRound(1)}
-              style={{
-                ...styles.roundButton,
-                ...(state.round === 1 ? styles.roundButtonActive : {}),
-                backgroundColor: state.round === 1 ? "#ffc107" : "#f5f5f5",
-                color: state.round === 1 ? "white" : "#333",
-              }}
-            >
-              <Pause size={18} />
-              <span>Round 1 (Manual)</span>
-            </button>
-            <button
-              onClick={() => setRound(2)}
-              style={{
-                ...styles.roundButton,
-                ...(state.round === 2 ? styles.roundButtonActive : {}),
-                backgroundColor: state.round === 2 ? "#46178f" : "#f5f5f5",
-                color: state.round === 2 ? "white" : "#333",
-              }}
-            >
-              <Zap size={18} />
-              <span>Round 2 (Auto)</span>
-            </button>
-          </div>
+         <div style={styles.roundButtons}>
+  <button
+    onClick={() => setRound(1)}
+    style={{
+      ...styles.roundButton,
+      ...(state.round === 1 ? styles.roundButtonActive : {}),
+      backgroundColor: state.round === 1 ? "#ffc107" : "#f5f5f5",
+      color: state.round === 1 ? "white" : "#333",
+    }}
+  >
+    <Pause size={18} />
+    <span>Round 1 (Manual)</span>
+  </button>
+
+<button
+  type="button"
+  onClick={() => {
+    setRound(2);
+    publish({ type: "SET_ROUND", payload: { round: 2 } });
+  }}
+  style={{
+    ...styles.roundButton,
+    ...(state.round === 2 ? styles.roundButtonActive : {}),
+    backgroundColor: state.round === 2 ? "#46178f" : "#f5f5f5",
+    color: state.round === 2 ? "white" : "#333",
+  }}
+>
+  <Zap size={18} />
+  <span>Round 2 (Auto)</span>
+</button>
+
+
+</div>
+
         </div>
 
         {/* Time Controls */}
