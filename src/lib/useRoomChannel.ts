@@ -17,7 +17,6 @@ export function useRoomChannel(
     onMsgRef.current = onMsg;
   }, [onMsg]);
 
-  // Track whether channel is attached
   const isAttachedRef = useRef(false);
 
   useEffect(() => {
@@ -31,7 +30,6 @@ export function useRoomChannel(
 
     const attachAndSubscribe = async () => {
       try {
-        // ✅ ensure channel is attached before subscribing
         await channel.attach();
         if (cancelled) return;
 
@@ -59,9 +57,7 @@ export function useRoomChannel(
     (msg: RealtimeMsg) => {
       if (!channel) return;
 
-      // ✅ prevent publish before attach (helps “same session” reliability)
       if (!isAttachedRef.current) {
-        // quick retry (don’t block UI)
         channel.attach().then(() => {
           isAttachedRef.current = true;
           channel.publish("msg", msg);

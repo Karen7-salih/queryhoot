@@ -1,5 +1,5 @@
 export function generateRoomCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString(); // 6 digits
+  return Math.floor(100000 + Math.random() * 900000).toString(); 
 }
 
 export function formatTime(ms: number) {

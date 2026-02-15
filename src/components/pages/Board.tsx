@@ -58,7 +58,6 @@ useEffect(() => {
   const s = msg.payload;
   setServerState(s);
 
-  // anchor "server time" so it ticks smoothly on board
   const now = Date.now();
   setAnchorLocalMs(now);
   setAnchorServerMs(s.serverEpochMs);

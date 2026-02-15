@@ -39,7 +39,6 @@ export default function Player() {
 
   const [serverState, setServerState] = useState<RoomState | null>(null);
 
-  // For Round 1 "manual refresh": we keep a "last fetched snapshot"
   const [manualSnapshot, setManualSnapshot] = useState<RoomState | null>(null);
 
     const [nowMs, setNowMs] = useState(() => Date.now());
@@ -67,7 +66,6 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
       if (!prev) return prev;
       const next = { ...prev, round, version: prev.version + 1, refreshOwnerId: null };
 
-      // if round2 → instantly adopt auto sync behavior
       if (round === 2) {
         setManualSnapshot(next);
         setAnchorFromState(next);
@@ -103,7 +101,6 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
 
   const { publish } = useRoomChannel(roomCode, onMsg);
 
-  // When joining a room -> send JOIN
   useEffect(() => {
     if (!roomCode) return;
     publish({ type: "JOIN", payload: { playerId } });
@@ -147,11 +144,10 @@ refreshLockRef.current = true;
 
 
 
-  // What time do we show?
   const displayState = useMemo(() => {
     if (!serverState) return null;
-    if (serverState.round === 2) return serverState; // auto
-    return manualSnapshot; // Round 1 manual
+    if (serverState.round === 2) return serverState; 
+    return manualSnapshot; 
   }, [serverState, manualSnapshot]);
 
 
@@ -324,7 +320,6 @@ const styles = {
     padding: "20px",
   },
   
-  // Join screen styles
   joinContainer: {
     background: "white",
     borderRadius: "24px",
@@ -373,7 +368,6 @@ const styles = {
     boxShadow: "0 4px 12px rgba(70, 23, 143, 0.4)",
   },
   
-  // Game screen styles
   gameContainer: {
     background: "white",
     borderRadius: "24px",
