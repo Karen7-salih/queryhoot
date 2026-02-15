@@ -6,16 +6,23 @@ import { formatTime } from "../../lib/game";
 import { useRoomChannel } from "../../lib/useRoomChannel";
 import { Users, RefreshCw, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-function getOrCreatePlayerId() {
-  const key = "queryhoot_player_id";
 
-  const existing = localStorage.getItem(key);
+
+function getOrCreatePlayerId() {
+
+  const key = "queryhoot_player_id_session";
+  const existing = sessionStorage.getItem(key);
   if (existing) return existing;
 
-  const id = crypto.randomUUID();
-  localStorage.setItem(key, id);
+  const id =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  sessionStorage.setItem(key, id);
   return id;
 }
+
 
 export default function Player() {
   const [params] = useSearchParams();
@@ -108,10 +115,6 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
   setAnchorFromState(serverState);
 };
 
-
-
-
-
   // What time do we show?
   const displayState = useMemo(() => {
     if (!serverState) return null;
@@ -197,6 +200,13 @@ const onMsg = useCallback((msg: RealtimeMsg) => {
               <span style={styles.playersCount}>{serverState?.playerCount ?? "-"}</span>
             </div>
           </div>
+
+{serverState && (
+  <div style={{ fontFamily: "monospace", fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
+    me: {playerId.slice(0, 6)} | owner: {serverState.refreshOwnerId?.slice(0, 6) ?? "null"}
+  </div>
+)}
+
 
           {!serverState && (
             <div style={styles.waitingContainer}>
